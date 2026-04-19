@@ -1,0 +1,26 @@
+# ============================================
+# 🧪 Local Development Variables (.dev.vars)
+# Loaded by `wrangler dev` and should NOT be committed
+# ============================================
+
+# Runtime mode for local execution.
+NODE_ENV=development
+
+# Allowed browser origins for CORS during development.
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:5173
+
+# Adds security response headers (nosniff, frame options, referrer policy).
+SECURITY_HEADERS_ENABLED=true
+
+# App label for logs/debug output.
+APP_NAME=toy-api-dev
+
+# Basic auth switch. Keep false for normal local development.
+BASIC_AUTH_ENABLED=false
+
+# Credentials are only used when BASIC_AUTH_ENABLED=true.
+BASIC_AUTH_USERNAME=admin
+BASIC_AUTH_PASSWORD=change-me
+
+# Realm text shown by browser auth prompt.
+BASIC_AUTH_REALM=Toy API Dev

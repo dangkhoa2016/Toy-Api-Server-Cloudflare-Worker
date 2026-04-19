@@ -1,0 +1,88 @@
+# ============================================
+# 🌐 Base configuration (template only)
+# This file is SAFE to commit
+# Real values will be injected at deploy time
+# ============================================
+
+name = "toy-api-server-cloudflare-worker"
+main = "src/index.js"
+compatibility_date = "2026-04-19"
+
+# Default: disabled (overridden per env)
+workers_dev = false
+
+# --------------------------------------------
+# 🌍 Global variables (non-sensitive)
+# --------------------------------------------
+[vars]
+APP_NAME = "toy-api"
+SECURITY_HEADERS_ENABLED = "true"
+
+# ============================================
+# 🧪 Development Environment (safe defaults)
+# ============================================
+[env.development]
+workers_dev = true
+
+[env.development.vars]
+# Runtime mode
+NODE_ENV = "development"
+
+# Allowed browser origins for CORS
+CORS_ORIGINS = "http://localhost:3000,http://127.0.0.1:5173"
+
+# Basic auth policy (credentials come from .dev.vars)
+BASIC_AUTH_ENABLED = "false"
+BASIC_AUTH_REALM = "Toy API Dev"
+
+# App label and security headers
+APP_NAME = "toy-api-dev"
+SECURITY_HEADERS_ENABLED = "true"
+
+# Note: BASIC_AUTH_USERNAME / BASIC_AUTH_PASSWORD are intentionally omitted here
+# and should be provided via .dev.vars in local development.
+
+[[env.development.kv_namespaces]]
+binding = "TOY_STATE"
+preview_id = "kv-local"
+
+[env.development.assets]
+directory = "./public"
+binding = "ASSETS"
+
+# ============================================
+# 🚀 Production Environment (PLACEHOLDERS)
+# These will be replaced dynamically
+# ============================================
+[env.production]
+
+# ⚠️ Will be injected
+# routes = []
+
+[env.production.vars]
+# Runtime mode
+NODE_ENV = "production"
+
+# Allowed production CORS origins (injected by deploy.js)
+CORS_ORIGINS = "__CORS_ORIGINS__"
+
+# Basic auth policy (credentials should be set as Wrangler secrets)
+BASIC_AUTH_ENABLED = "false"
+BASIC_AUTH_REALM = "Protected API"
+
+# App label and security headers
+APP_NAME = "toy-api"
+SECURITY_HEADERS_ENABLED = "true"
+
+# Note: BASIC_AUTH_USERNAME / BASIC_AUTH_PASSWORD are intentionally omitted here.
+# Recommended command:
+#   wrangler secret put BASIC_AUTH_USERNAME --env production
+#   wrangler secret put BASIC_AUTH_PASSWORD --env production
+
+[[env.production.kv_namespaces]]
+binding = "TOY_STATE"
+id = "__KV_NAMESPACE_ID__"
+
+[env.production.assets]
+directory = "./public"
+binding = "ASSETS"

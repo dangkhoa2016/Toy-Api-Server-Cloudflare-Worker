@@ -1,0 +1,14 @@
+.idea
+*.log
+.DS_Store
+.terraform
+.terragrunt-cache
+node_modules/
+.wrangler/
+.dev.vars
+dist/
+coverage/
+
+wrangler.toml
+.env.production
+.env.staging
