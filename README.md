@@ -163,3 +163,37 @@ Create KV namespace IDs before first real deployment:
 npx wrangler kv namespace create TOY_STATE
 npx wrangler kv namespace create TOY_STATE --preview
 ```
+
+## Test and curl
+
+Start the Worker first:
+
+```bash
+npm run dev
+```
+
+Run smoke tests with Node test runner:
+
+```bash
+npm run test:api
+```
+
+Run curl script to inspect responses quickly:
+
+```bash
+npm run curl:api
+```
+
+Optional base URL override:
+
+```bash
+BASE_URL=http://127.0.0.1:8788 npm run curl:api
+API_BASE_URL=http://127.0.0.1:8788 npm run test:api
+```
+
+If Basic Auth is enabled, export credentials before running test/curl:
+
+```bash
+export BASIC_AUTH_USERNAME=admin
+export BASIC_AUTH_PASSWORD=change-me
+```

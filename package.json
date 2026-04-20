@@ -10,7 +10,9 @@
     "dev": "node dev.js",
     "deploy": "node deploy.js",
     "check:stag": "wrangler deploy --dry-run --env staging --config wrangler.template.toml",
-    "check:prod": "node deploy.js --dry-run"
+    "check:prod": "node deploy.js --dry-run",
+    "test:api": "node test/api-smoke.test.js",
+    "curl:api": "bash scripts/curl-api.sh"
   },
   "devDependencies": {
     "wrangler": "^4.83.0"

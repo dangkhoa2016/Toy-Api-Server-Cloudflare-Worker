@@ -98,6 +98,7 @@ export function isCorsOriginAllowed(origin, options = {}, request) {
 
   if (!origin) return true;
   if (!isProduction && trustedOrigins.size === 0) return true;
+  if (!isProduction && isLoopbackOrigin(origin)) return true;
   if (trustedOrigins.has(origin)) return true;
 
   const requestPublicOrigin = getRequestPublicOrigin(request);
