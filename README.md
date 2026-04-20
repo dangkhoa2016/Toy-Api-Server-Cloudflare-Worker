@@ -70,6 +70,18 @@ Default `CLOUDFLARE_KV_PREFIX` is `toy-api-server` when not explicitly configure
 
 `clientKey` is derived from request client identity (typically IP resolution in request handling).
 
+### KV key TTL
+
+Each key type has a different KV expiration TTL, derived from policy defaults plus a buffer:
+
+| Prefix | KV TTL | Calculation | Effective window / lifetime |
+| --- | --- | --- | --- |
+| `…:toy:<id>` | **900 s (15 min)** | `toyTtlMs` (default 15 min) | Toy lives exactly `TOY_TTL_MS` |
+| `…:ratelimit:<clientKey>` | **360 s (6 min)** | `ceil(rateLimitWindowMs / 1000) + 60 s buffer` | Rate-limit window is 5 min; key kept 1 min after reset |
+| `…:seed:<clientKey>` | **1680 s (28 min)** | `ceil((seedWindowMs + toyTtlMs) / 1000) + 180 s buffer` | Seed window is 10 min; key retained until last toy created at window end can expire (10 min + 15 min + 3 min buffer) |
+
+TTL defaults are defined in `src/lib/variables.js` (`toyPolicyFallbacks`). TTL buffer logic is applied in `src/stores/kv_state_store.js` (`normalizeTtlSeconds`).
+
 ## Local development
 
 1. Install dependencies:
