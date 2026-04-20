@@ -237,16 +237,27 @@ npx wrangler kv namespace create TOY_STATE --preview
 
 ## Test and curl
 
-Start the Worker first:
+Run smoke tests with auto-start behavior:
+
+```bash
+npm run test:api
+```
+
+Default behavior of `npm run test:api`:
+
+- If API server is already running at `API_BASE_URL` (default `http://127.0.0.1:8787`), tests reuse it.
+- If API server is not running, test runner auto-starts `wrangler dev`, waits for `/healthz`, runs tests, then stops the server.
+
+Start Worker manually only when needed:
 
 ```bash
 npm run dev
 ```
 
-Run smoke tests with Node test runner:
+Run raw Node test file (requires server already running):
 
 ```bash
-npm run test:api
+npm run test:api:raw
 ```
 
 Run curl script to inspect responses quickly:
@@ -262,6 +273,16 @@ Optional base URL override:
 ```bash
 BASE_URL=http://127.0.0.1:8788 npm run curl:api
 API_BASE_URL=http://127.0.0.1:8788 npm run test:api
+```
+
+Optional test runner controls:
+
+```bash
+# Disable auto-start and require external server
+API_TEST_AUTOSTART=false npm run test:api
+
+# Tune startup wait timeout (milliseconds)
+API_TEST_STARTUP_TIMEOUT_MS=60000 npm run test:api
 ```
 
 If Basic Auth is enabled, export credentials before running test/curl:

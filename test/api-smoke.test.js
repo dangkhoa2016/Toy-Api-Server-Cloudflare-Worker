@@ -37,7 +37,7 @@ async function apiRequest(pathname, options = {}) {
     });
   } catch (error) {
     throw new Error(
-      `Cannot reach API at ${API_BASE_URL}. Start server with \"npm run dev\" before running tests. Root error: ${error.message}`,
+      `Cannot reach API at ${API_BASE_URL}. Run \"npm run test:api\" (auto-start) or start server manually with \"npm run dev\". Root error: ${error.message}`,
     );
   }
 }
