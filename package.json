@@ -13,7 +13,9 @@
     "check:prod": "node deploy.js --dry-run",
     "test:api": "node scripts/run-api-tests.mjs",
     "test:api:raw": "node test/api-smoke.test.js",
-    "curl:api": "bash scripts/curl-api.sh"
+    "test:load": "node scripts/run-load-test.mjs",
+    "curl:api": "bash scripts/curl-api.sh",
+    "test": "npm run test:api && npm run test:load"
   },
   "devDependencies": {
     "wrangler": "^4.83.0"

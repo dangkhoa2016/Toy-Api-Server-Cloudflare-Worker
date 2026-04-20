@@ -268,11 +268,20 @@ npm run curl:api
 
 `curl:api` now validates expected HTTP status codes for each step and exits non-zero on mismatches.
 
+Run light load test for concurrent create behavior:
+
+```bash
+npm run test:load
+```
+
+`test:load` can auto-start local Worker and prints a JSON summary (status distribution, unique IDs, listed records, cleanup result).
+
 Optional base URL override:
 
 ```bash
 BASE_URL=http://127.0.0.1:8788 npm run curl:api
 API_BASE_URL=http://127.0.0.1:8788 npm run test:api
+API_BASE_URL=http://127.0.0.1:8788 npm run test:load
 ```
 
 Optional test runner controls:
@@ -283,6 +292,19 @@ API_TEST_AUTOSTART=false npm run test:api
 
 # Tune startup wait timeout (milliseconds)
 API_TEST_STARTUP_TIMEOUT_MS=60000 npm run test:api
+```
+
+Optional load-test controls:
+
+```bash
+# Request profile
+LOAD_TEST_TOTAL_REQUESTS=120 LOAD_TEST_CONCURRENCY=24 npm run test:load
+
+# Disable auto-start and require external server
+LOAD_TEST_AUTOSTART=false npm run test:load
+
+# Keep test data for manual inspection
+LOAD_TEST_CLEANUP=false npm run test:load
 ```
 
 If Basic Auth is enabled, export credentials before running test/curl:
