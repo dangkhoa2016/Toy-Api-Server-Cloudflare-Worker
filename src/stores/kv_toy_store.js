@@ -1,6 +1,20 @@
 const TOY_KEY_SEGMENT = 'toy';
 const DEFAULT_CLOUDFLARE_KV_PREFIX = 'toy-api-server';
 const DEFAULT_MAX_SCAN_KEYS = 5000;
+const MAX_ID_ALLOCATION_ATTEMPTS = 12;
+const MAX_SAFE_INTEGER_MASK = (1n << 53n) - 1n;
+
+function generateRandomToyId() {
+  if (!globalThis.crypto || typeof globalThis.crypto.getRandomValues !== 'function') {
+    return Math.max(1, Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
+  }
+
+  const randomParts = new Uint32Array(2);
+  globalThis.crypto.getRandomValues(randomParts);
+
+  const combined = (BigInt(randomParts[0]) << 32n) | BigInt(randomParts[1]);
+  return Number((combined & MAX_SAFE_INTEGER_MASK) || 1n);
+}
 
 function resolveKvKeyPrefix(kvPrefix) {
   if (typeof kvPrefix !== 'string') return DEFAULT_CLOUDFLARE_KV_PREFIX;
@@ -138,16 +152,15 @@ export default class KvToyStore {
     return this.getToyByKeyName(this.toyKey(normalizedId), referenceTime);
   }
 
-  async nextToyId(referenceTime = new Date()) {
-    const toys = await this.listToys({ referenceTime });
-    let nextId = 1;
+  async nextToyId(referenceTime = new Date(), options = {}) {
+    const { maxAttempts = MAX_ID_ALLOCATION_ATTEMPTS } = options;
 
-    for (const toy of toys) {
-      if (toy.id === nextId) nextId += 1;
-      if (toy.id > nextId) break;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const candidateId = generateRandomToyId();
+      const existingToy = await this.findToyById(candidateId, { referenceTime });
+      if (!existingToy) return candidateId;
     }
-
-    return nextId;
+    throw new Error(`Unable to allocate toy id after ${maxAttempts} attempts`);
   }
 
   async saveToy(toy) {

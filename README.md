@@ -43,8 +43,8 @@ Cloudflare Worker implementation for migrating from the Node.js Fastify project.
   - Worker assets directory: `src/assets`
   - `/docs` serves `src/assets/docs.html`
   - `/imgs/*`, `/favicon.ico`, `/favicon.png` are served via `ASSETS`
-- Prevent same-isolate ID collision during concurrent create requests:
-  - `POST /api/toys` is serialized through an in-memory create queue in `src/routes/toys.js`
+- Reduce ID collision risk across concurrent and multi-isolate creates:
+  - `POST /api/toys` now uses collision-resistant safe-integer ID allocation in `src/stores/kv_toy_store.js`
 - Add consistent response headers (`x-request-id`, `x-correlation-id`) and CORS preflight handling.
 
 ## Architecture snapshot
@@ -295,4 +295,4 @@ export BASIC_AUTH_PASSWORD=change-me
 ## Notes on create/list behavior
 
 - If you send many `POST /api/toys` requests from the same IP, some requests can return `429` because of per-IP rate/quota policy.
-- Concurrent creates are serialized per isolate to reduce KV key overwrite races when allocating new toy IDs.
+- Toy IDs are no longer sequentially allocated. They are generated as collision-resistant safe integers to avoid key overwrite races under concurrent create load.

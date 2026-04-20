@@ -243,3 +243,59 @@ test('Toy API CRUD + likes + export flow', async () => {
   assert.equal(deletedReadResponse.status, 404);
   assert.equal(deletedReadPayload.error?.statusCode, 404);
 });
+
+test('Concurrent create burst keeps unique IDs and no record loss', async () => {
+  const burstSize = 10;
+  const burstSuffix = Date.now();
+
+  const createResponses = await Promise.all(
+    Array.from({ length: burstSize }, (_, index) =>
+      apiRequest('/api/toys', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-forwarded-for': `10.88.0.${index + 1}`,
+        },
+        body: JSON.stringify({
+          name: `Burst-${burstSuffix}-${index}`,
+          image: `https://example.com/burst-${index}.png`,
+          likes: index,
+        }),
+      }),
+    ),
+  );
+
+  for (const response of createResponses) {
+    assert.equal(response.status, 201);
+  }
+
+  const createdToys = await Promise.all(createResponses.map((response) => parseJson(response)));
+  for (const createdToy of createdToys) {
+    assertToyShape(createdToy);
+  }
+
+  const createdIds = createdToys.map((toy) => toy.id);
+  assert.equal(createdIds.every(Number.isSafeInteger), true);
+  assert.equal(new Set(createdIds).size, burstSize);
+
+  const listResponse = await apiRequest('/api/toys');
+  const listedToys = await parseJson(listResponse);
+  assert.equal(listResponse.status, 200);
+
+  const burstNamePrefix = `Burst-${burstSuffix}-`;
+  const burstToys = listedToys.filter(
+    (toy) => typeof toy.name === 'string' && toy.name.startsWith(burstNamePrefix),
+  );
+  assert.equal(burstToys.length, burstSize);
+  assert.equal(new Set(burstToys.map((toy) => toy.id)).size, burstSize);
+
+  for (const toyId of createdIds) {
+    const deleteResponse = await apiRequest(`/api/toys/${toyId}`, {
+      method: 'DELETE',
+    });
+    const deletePayload = await parseJson(deleteResponse);
+
+    assert.equal(deleteResponse.status, 200);
+    assert.equal(deletePayload.deleted, true);
+  }
+});

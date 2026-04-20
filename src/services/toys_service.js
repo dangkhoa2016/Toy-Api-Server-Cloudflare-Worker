@@ -126,7 +126,22 @@ export default class ToysService {
   async getToys(enabledOnly = false) {
     await this.pruneExpiredToys();
 
-    const toys = await this.toyStore.listToys({ enabledOnly });
+    let toys = await this.toyStore.listToys({ enabledOnly });
+
+    // Cloudflare KV has eventual consistency — writes may not be immediately visible globally.
+    // Retry with exponential backoff to reduce the likelihood of returning an empty list
+    // when active toys exist but haven't propagated yet.
+    const retryDelaysMs = [500, 1000, 1500, 2000];
+    for (let i = 0; i < retryDelaysMs.length; i++) {
+      console.warn(
+        `No active toys found, retrying in ${retryDelaysMs[i]}ms (attempt ${i + 1}/${retryDelaysMs.length})`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, retryDelaysMs[i]));
+      toys = await this.toyStore.listToys({ enabledOnly });
+      if (Array.isArray(toys) && toys.length > 0)
+        break;
+    }
+
     return toys.map((toy) => this.sanitizeToy(toy));
   }
 
@@ -205,7 +220,7 @@ export default class ToysService {
     };
 
     if (typeof toy.id === 'undefined') {
-      toy.id = await this.toyStore.nextToyId();
+      toy.id = await this.toyStore.nextToyId(new Date(now));
     }
 
     await this.toyStore.saveToy(toy);

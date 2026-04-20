@@ -8,13 +8,6 @@ import {
 } from '../lib/validation.js';
 
 const updateActions = new Set(['POST', 'PUT', 'PATCH']);
-let createQueue = Promise.resolve();
-
-function enqueueCreateTask(task) {
-  const scheduledTask = createQueue.then(task, task);
-  createQueue = scheduledTask.catch(() => {});
-  return scheduledTask;
-}
 
 function parseRouteParams(pathname) {
   const likesMatch = pathname.match(/^\/api\/toys\/([^/]+)\/likes$/);
@@ -184,9 +177,7 @@ export async function handleToysRoutes({
       );
     }
 
-    // KV does not provide atomic auto-increment for IDs, so we serialize create
-    // operations per isolate to avoid concurrent ID collisions and overwrites.
-    return enqueueCreateTask(() => createToy(body));
+    return createToy(body);
   }
 
   const params = parseRouteParams(pathname);
