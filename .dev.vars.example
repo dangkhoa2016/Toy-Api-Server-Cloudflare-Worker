@@ -9,6 +9,9 @@ NODE_ENV=development
 # Allowed browser origins for CORS during development.
 CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:5173
 
+# Prefix added before all KV keys to isolate this service in shared namespaces.
+CLOUDFLARE_KV_PREFIX=toy-api-server
+
 # Adds security response headers (nosniff, frame options, referrer policy).
 SECURITY_HEADERS_ENABLED=true
 

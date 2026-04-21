@@ -1,5 +1,13 @@
-const TOY_KEY_PREFIX = 'toy:';
+const TOY_KEY_SEGMENT = 'toy';
+const DEFAULT_CLOUDFLARE_KV_PREFIX = 'toy-api-server';
 const DEFAULT_MAX_SCAN_KEYS = 5000;
+
+function resolveKvKeyPrefix(kvPrefix) {
+  if (typeof kvPrefix !== 'string') return DEFAULT_CLOUDFLARE_KV_PREFIX;
+
+  const normalizedPrefix = kvPrefix.trim().replace(/:+$/, '');
+  return normalizedPrefix || DEFAULT_CLOUDFLARE_KV_PREFIX;
+}
 
 function toEpochMs(referenceTime) {
   if (referenceTime instanceof Date) return referenceTime.getTime();
@@ -57,13 +65,14 @@ export default class KvToyStore {
     if (!kv) throw new Error('KvToyStore requires a KV binding');
 
     this.kv = kv;
+    this.toyKeyPrefix = `${resolveKvKeyPrefix(options.kvPrefix)}:${TOY_KEY_SEGMENT}:`;
     this.maxScanKeys = Number.isFinite(Number(options.maxScanKeys))
       ? Math.max(100, Math.floor(Number(options.maxScanKeys)))
       : DEFAULT_MAX_SCAN_KEYS;
   }
 
   toyKey(id) {
-    return `${TOY_KEY_PREFIX}${id}`;
+    return `${this.toyKeyPrefix}${id}`;
   }
 
   async listToyKeyNames() {
@@ -73,7 +82,7 @@ export default class KvToyStore {
 
     do {
       const page = await this.kv.list({
-        prefix: TOY_KEY_PREFIX,
+        prefix: this.toyKeyPrefix,
         cursor,
       });
       for (const key of page.keys || []) {

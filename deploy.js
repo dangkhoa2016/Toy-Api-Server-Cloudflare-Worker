@@ -43,6 +43,7 @@ function generateWranglerToml(envVars) {
 
   const domain = envVars.DOMAIN
   const sub = envVars.API_SUBDOMAIN
+  const kvPrefix = envVars.CLOUDFLARE_KV_PREFIX || "toy-api-server"
 
   const routeBlock = `
 routes = [
@@ -55,6 +56,7 @@ routes = [
   // Replace placeholders
   output = output.replace("__CORS_ORIGINS__", envVars.CORS_ORIGINS)
   output = output.replace("__KV_NAMESPACE_ID__", envVars.KV_NAMESPACE_ID)
+  output = output.replace("__CLOUDFLARE_KV_PREFIX__", kvPrefix)
 
   // Inject routes
   output = output.replace(

@@ -62,9 +62,11 @@ Cloudflare KV entries in `TOY_STATE` use prefixes to separate data domains:
 
 | Prefix | Purpose | Managed in |
 | --- | --- | --- |
-| `toy:<id>` | Toy entity payloads | `src/stores/kv_toy_store.js` |
-| `ratelimit:<clientKey>` | Per-client create rate-limit state (`count`, `resetAt`) | `src/stores/kv_state_store.js` |
-| `seed:<clientKey>` | Per-client seed-window state (`firstCreateAt`, `successfulCreates`) | `src/stores/kv_state_store.js` |
+| `<CLOUDFLARE_KV_PREFIX>:toy:<id>` | Toy entity payloads | `src/stores/kv_toy_store.js` |
+| `<CLOUDFLARE_KV_PREFIX>:ratelimit:<clientKey>` | Per-client create rate-limit state (`count`, `resetAt`) | `src/stores/kv_state_store.js` |
+| `<CLOUDFLARE_KV_PREFIX>:seed:<clientKey>` | Per-client seed-window state (`firstCreateAt`, `successfulCreates`) | `src/stores/kv_state_store.js` |
+
+Default `CLOUDFLARE_KV_PREFIX` is `toy-api-server` when not explicitly configured.
 
 `clientKey` is derived from request client identity (typically IP resolution in request handling).
 
@@ -104,6 +106,7 @@ npm run dev
 | --- | --- | --- |
 | `NODE_ENV` | Yes | Runtime mode for local worker execution. |
 | `CORS_ORIGINS` | Yes | Allowed browser origins for CORS. |
+| `CLOUDFLARE_KV_PREFIX` | No (recommended) | Prefix prepended to all KV keys to isolate this service in shared namespaces. |
 | `SECURITY_HEADERS_ENABLED` | No (recommended) | Enables security headers (`nosniff`, frame/referrer policy). |
 | `APP_NAME` | No | App label for logs/debug context. |
 | `BASIC_AUTH_ENABLED` | No | Turns HTTP Basic Auth middleware on/off. |
@@ -130,6 +133,7 @@ and can also carry runtime policy settings.
 | `DOMAIN` | Yes | Cloudflare zone name used as `zone_name` in route binding. |
 | `API_SUBDOMAIN` | Yes | API host prefix; final host is `<API_SUBDOMAIN>.<DOMAIN>`. |
 | `CORS_ORIGINS` | Yes | Runtime CORS allowlist injected into worker vars. |
+| `CLOUDFLARE_KV_PREFIX` | No (recommended) | Prefix prepended to all KV keys to isolate this service in shared namespaces. |
 | `KV_NAMESPACE_ID` | Yes | KV namespace ID bound to `TOY_STATE`. |
 | `APP_NAME` | No | Runtime app label for logs/debug context. |
 | `SECURITY_HEADERS_ENABLED` | No (recommended) | Enables security headers in runtime responses. |

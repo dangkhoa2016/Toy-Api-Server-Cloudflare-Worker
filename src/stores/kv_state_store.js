@@ -5,19 +5,31 @@ function normalizeTtlSeconds(windowMs, additionalSeconds = 60) {
   return Math.max(60, seconds + additionalSeconds);
 }
 
+const DEFAULT_CLOUDFLARE_KV_PREFIX = 'toy-api-server';
+
+function resolveKvKeyPrefix(kvPrefix) {
+  if (typeof kvPrefix !== 'string') return DEFAULT_CLOUDFLARE_KV_PREFIX;
+
+  const normalizedPrefix = kvPrefix.trim().replace(/:+$/, '');
+  return normalizedPrefix || DEFAULT_CLOUDFLARE_KV_PREFIX;
+}
+
 export default class KvStateStore {
-  constructor(kv) {
+  constructor(kv, options = {}) {
     if (!kv) throw new Error('KvStateStore requires a KV binding');
 
     this.kv = kv;
+    this.kvPrefix = resolveKvKeyPrefix(options.kvPrefix);
+    this.rateLimitKeyPrefix = `${this.kvPrefix}:ratelimit:`;
+    this.seedKeyPrefix = `${this.kvPrefix}:seed:`;
   }
 
   getRateLimitKey(clientKey) {
-    return `ratelimit:${clientKey}`;
+    return `${this.rateLimitKeyPrefix}${clientKey}`;
   }
 
   getSeedKey(clientKey) {
-    return `seed:${clientKey}`;
+    return `${this.seedKeyPrefix}${clientKey}`;
   }
 
   async getRateLimit(clientKey) {

@@ -31,6 +31,9 @@ NODE_ENV = "development"
 # Allowed browser origins for CORS
 CORS_ORIGINS = "http://localhost:3000,http://127.0.0.1:5173"
 
+# Prefix added before all KV keys to avoid collisions when sharing a KV namespace.
+CLOUDFLARE_KV_PREFIX = "toy-api-server"
+
 # Basic auth policy (credentials come from .dev.vars)
 BASIC_AUTH_ENABLED = "false"
 BASIC_AUTH_REALM = "Toy API Dev"
@@ -65,6 +68,10 @@ NODE_ENV = "production"
 
 # Allowed production CORS origins (injected by deploy.js)
 CORS_ORIGINS = "__CORS_ORIGINS__"
+
+# Prefix added before all KV keys to avoid collisions when sharing a KV namespace.
+# Injected by deploy.js and defaults to "toy-api-server" when unset.
+CLOUDFLARE_KV_PREFIX = "__CLOUDFLARE_KV_PREFIX__"
 
 # Basic auth policy (credentials should be set as Wrangler secrets)
 BASIC_AUTH_ENABLED = "false"

@@ -27,7 +27,17 @@ const DEFAULT_SKIPPED_RATE_LIMIT_PATHS = new Set([
   '/favicon.ico',
   '/favicon.png',
 ]);
+const DEFAULT_CLOUDFLARE_KV_PREFIX = 'toy-api-server';
 const workerStartedAt = Date.now();
+
+function resolveKvPrefix(env = {}) {
+  if (typeof env.CLOUDFLARE_KV_PREFIX !== 'string') {
+    return DEFAULT_CLOUDFLARE_KV_PREFIX;
+  }
+
+  const normalizedPrefix = env.CLOUDFLARE_KV_PREFIX.trim().replace(/:+$/, '');
+  return normalizedPrefix || DEFAULT_CLOUDFLARE_KV_PREFIX;
+}
 
 function resolveRateLimitOptions(env = {}, nodeEnv = 'development') {
   const toyPolicyDefaults = getToyPolicyDefaults(env);
@@ -242,6 +252,7 @@ function ensureBindings(env) {
 export default {
   async fetch(request, env) {
     const nodeEnv = env.NODE_ENV || 'development';
+    const kvPrefix = resolveKvPrefix(env);
 
     const requestId = crypto.randomUUID();
     const correlationId = request.headers.get('x-correlation-id') || requestId;
@@ -284,8 +295,8 @@ export default {
 
     try {
       ensureBindings(env);
-      const stateStore = new KvStateStore(env.TOY_STATE);
-      const toyStore = new KvToyStore(env.TOY_STATE);
+      const stateStore = new KvStateStore(env.TOY_STATE, { kvPrefix });
+      const toyStore = new KvToyStore(env.TOY_STATE, { kvPrefix });
 
       const rateLimitOptions = resolveRateLimitOptions(env, nodeEnv);
       const rateLimitState = await applyRateLimitIfNeeded(
@@ -380,7 +391,8 @@ export default {
     try {
       if (!env.TOY_STATE) return;
 
-      const toyStore = new KvToyStore(env.TOY_STATE);
+      const kvPrefix = resolveKvPrefix(env);
+      const toyStore = new KvToyStore(env.TOY_STATE, { kvPrefix });
       await toyStore.pruneExpiredToys(new Date());
     } catch (error) {
       console.error('Scheduled cleanup failed', String(error?.message || error));
