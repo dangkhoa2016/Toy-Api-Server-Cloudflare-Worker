@@ -7,6 +7,16 @@ Cloudflare Worker implementation for migrating from the Node.js Fastify project.
 - Scaffold Worker project with Wrangler.
 - Port core constants and policy defaults.
 - Port shared helpers: HTTP payload, client key parsing, CORS, basic auth, request validation.
+- Align naming with Node.js project style:
+  - `src/lib/variables.js`
+  - `src/lib/request_client.js`
+  - `src/services/toys_service.js`
+  - `src/stores/kv_state_store.js`
+  - `src/stores/kv_toy_store.js`
+- Split and group routes for readability:
+  - `src/routes/home.js`
+  - `src/routes/errors.js`
+  - `src/routes/toys.js`
 - Implement system routes:
   - `GET /`
   - `GET /health`
@@ -16,9 +26,47 @@ Cloudflare Worker implementation for migrating from the Node.js Fastify project.
   - `GET /500`
   - `GET /favicon.ico`
   - `GET /favicon.png`
+- Implement toy routes on KV:
+  - `GET /api/toys`
+  - `GET /api/toys/export`
+  - `POST /api/toys`
+  - `GET /api/toys/:id`
+  - `PATCH|PUT|POST /api/toys/:id`
+  - `PATCH|PUT|POST /api/toys/:id/likes`
+  - `DELETE /api/toys/:id`
+- Add anti-abuse policy controls:
+  - per-IP `POST /api/toys` rate limit
+  - per-IP active toy quota with seed window expansion
+  - global active toy cap
+  - toy TTL and scheduled cleanup
+- Serve docs and icons via static asset binding:
+  - Worker assets directory: `src/assets`
+  - `/docs` serves `src/assets/docs.html`
+  - `/imgs/*`, `/favicon.ico`, `/favicon.png` are served via `ASSETS`
+- Prevent same-isolate ID collision during concurrent create requests:
+  - `POST /api/toys` is serialized through an in-memory create queue in `src/routes/toys.js`
 - Add consistent response headers (`x-request-id`, `x-correlation-id`) and CORS preflight handling.
 
-`/api/toys*` routes are not implemented yet and currently return `501`.
+## Architecture snapshot
+
+- Entry point and request pipeline: `src/index.js`
+- Shared libs: `src/lib/*.js`
+- Route modules: `src/routes/*.js`
+- Domain service: `src/services/toys_service.js`
+- KV stores: `src/stores/*.js`
+- Static docs/icons: `src/assets/**`
+
+## KV key naming
+
+Cloudflare KV entries in `TOY_STATE` use prefixes to separate data domains:
+
+| Prefix | Purpose | Managed in |
+| --- | --- | --- |
+| `toy:<id>` | Toy entity payloads | `src/stores/kv_toy_store.js` |
+| `ratelimit:<clientKey>` | Per-client create rate-limit state (`count`, `resetAt`) | `src/stores/kv_state_store.js` |
+| `seed:<clientKey>` | Per-client seed-window state (`firstCreateAt`, `successfulCreates`) | `src/stores/kv_state_store.js` |
+
+`clientKey` is derived from request client identity (typically IP resolution in request handling).
 
 ## Local development
 
@@ -62,10 +110,20 @@ npm run dev
 | `BASIC_AUTH_USERNAME` | Required when auth enabled | Basic auth username. |
 | `BASIC_AUTH_PASSWORD` | Required when auth enabled | Basic auth password. |
 | `BASIC_AUTH_REALM` | No | Realm text shown in auth challenge. |
+| `RATE_LIMIT_ENABLED` | No (recommended) | Enables/disables per-IP `POST /api/toys` rate limiting. |
+| `RATE_LIMIT_MAX` | No | Max allowed creates per rate-limit window. |
+| `RATE_LIMIT_WINDOW_MS` | No | Rate-limit window in milliseconds. |
+| `MAX_ACTIVE_TOYS_GLOBAL` | No | Global cap for active toys across all clients. |
+| `MAX_TOYS_PER_IP` | No | Default active toy quota per client IP. |
+| `SEED_MAX_TOYS_PER_IP` | No | Expanded per-IP quota during seed window. |
+| `SEED_WINDOW_MS` | No | Seed window duration in milliseconds. |
+| `TOY_TTL_MS` | No | Toy time-to-live (TTL) in milliseconds. |
+| `TOY_CLEANUP_INTERVAL_MS` | No | Cleanup interval for pruning expired toys (milliseconds). |
 
 ### `.env.staging` and `.env.production` (deploy-time inputs)
 
-These files are consumed by `deploy.js` to generate `wrangler.toml` and route bindings.
+These files are consumed by `deploy.js` to generate `wrangler.toml` and route bindings,
+and can also carry runtime policy settings.
 
 | Key | Required for deploy | Purpose |
 | --- | --- | --- |
@@ -79,6 +137,15 @@ These files are consumed by `deploy.js` to generate `wrangler.toml` and route bi
 | `BASIC_AUTH_REALM` | No | Realm text for auth challenge. |
 | `BASIC_AUTH_USERNAME` | Required when auth enabled | Basic auth username (prefer Wrangler secrets in production). |
 | `BASIC_AUTH_PASSWORD` | Required when auth enabled | Basic auth password (prefer Wrangler secrets in production). |
+| `RATE_LIMIT_ENABLED` | No | Enables/disables per-IP `POST /api/toys` rate limiting. |
+| `RATE_LIMIT_MAX` | No | Max allowed creates per rate-limit window. |
+| `RATE_LIMIT_WINDOW_MS` | No | Rate-limit window in milliseconds. |
+| `MAX_ACTIVE_TOYS_GLOBAL` | No | Global cap for active toys across all clients. |
+| `MAX_TOYS_PER_IP` | No | Default active toy quota per client IP. |
+| `SEED_MAX_TOYS_PER_IP` | No | Expanded per-IP quota during seed window. |
+| `SEED_WINDOW_MS` | No | Seed window duration in milliseconds. |
+| `TOY_TTL_MS` | No | Toy time-to-live (TTL) in milliseconds. |
+| `TOY_CLEANUP_INTERVAL_MS` | No | Cleanup interval for pruning expired toys (milliseconds). |
 
 ## Deployment overview
 
@@ -184,6 +251,8 @@ Run curl script to inspect responses quickly:
 npm run curl:api
 ```
 
+`curl:api` now validates expected HTTP status codes for each step and exits non-zero on mismatches.
+
 Optional base URL override:
 
 ```bash
@@ -197,3 +266,8 @@ If Basic Auth is enabled, export credentials before running test/curl:
 export BASIC_AUTH_USERNAME=admin
 export BASIC_AUTH_PASSWORD=change-me
 ```
+
+## Notes on create/list behavior
+
+- If you send many `POST /api/toys` requests from the same IP, some requests can return `429` because of per-IP rate/quota policy.
+- Concurrent creates are serialized per isolate to reduce KV key overwrite races when allocating new toy IDs.

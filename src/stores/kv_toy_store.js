@@ -1,0 +1,210 @@
+const TOY_KEY_PREFIX = 'toy:';
+const DEFAULT_MAX_SCAN_KEYS = 5000;
+
+function toEpochMs(referenceTime) {
+  if (referenceTime instanceof Date) return referenceTime.getTime();
+
+  return new Date(referenceTime).getTime();
+}
+
+function toExpirationSeconds(dateInput) {
+  const epochMs = toEpochMs(dateInput);
+  if (!Number.isFinite(epochMs)) return null;
+
+  return Math.floor(epochMs / 1000);
+}
+
+function isValidToyShape(toy) {
+  if (!toy || typeof toy !== 'object') return false;
+  if (!Number.isInteger(Number(toy.id))) return false;
+  if (typeof toy.name !== 'string') return false;
+  if (typeof toy.image !== 'string') return false;
+  if (!Number.isInteger(Number(toy.likes))) return false;
+  if (typeof toy.enabled !== 'boolean') return false;
+  if (typeof toy.created_at !== 'string') return false;
+  if (typeof toy.updated_at !== 'string') return false;
+  if (typeof toy.expires_at !== 'string') return false;
+
+  return true;
+}
+
+function normalizeToy(toy) {
+  if (!isValidToyShape(toy)) return null;
+
+  return {
+    id: Number(toy.id),
+    name: toy.name,
+    image: toy.image,
+    likes: Number(toy.likes),
+    enabled: Boolean(toy.enabled),
+    created_by_ip: toy.created_by_ip || null,
+    created_at: toy.created_at,
+    updated_at: toy.updated_at,
+    expires_at: toy.expires_at,
+  };
+}
+
+function isToyExpired(toy, referenceTime = new Date()) {
+  const expiresAtMs = toEpochMs(toy?.expires_at);
+  const referenceMs = toEpochMs(referenceTime);
+  if (!Number.isFinite(expiresAtMs) || !Number.isFinite(referenceMs)) return false;
+
+  return expiresAtMs <= referenceMs;
+}
+
+export default class KvToyStore {
+  constructor(kv, options = {}) {
+    if (!kv) throw new Error('KvToyStore requires a KV binding');
+
+    this.kv = kv;
+    this.maxScanKeys = Number.isFinite(Number(options.maxScanKeys))
+      ? Math.max(100, Math.floor(Number(options.maxScanKeys)))
+      : DEFAULT_MAX_SCAN_KEYS;
+  }
+
+  toyKey(id) {
+    return `${TOY_KEY_PREFIX}${id}`;
+  }
+
+  async listToyKeyNames() {
+    let cursor = undefined;
+    let safetyCount = 0;
+    const names = [];
+
+    do {
+      const page = await this.kv.list({
+        prefix: TOY_KEY_PREFIX,
+        cursor,
+      });
+      for (const key of page.keys || []) {
+        names.push(key.name);
+        if (names.length >= this.maxScanKeys) return names;
+      }
+
+      cursor = page.list_complete ? undefined : page.cursor;
+      safetyCount += 1;
+      if (safetyCount > this.maxScanKeys) break;
+    } while (cursor);
+
+    return names;
+  }
+
+  async getToyByKeyName(keyName, referenceTime = new Date()) {
+    const rawToy = await this.kv.get(keyName, 'json');
+    const toy = normalizeToy(rawToy);
+    if (!toy) {
+      await this.kv.delete(keyName);
+      return null;
+    }
+
+    if (!isToyExpired(toy, referenceTime)) return toy;
+
+    await this.kv.delete(keyName);
+    return null;
+  }
+
+  async listToys(options = {}) {
+    const { clientKey, enabledOnly = false, referenceTime = new Date() } = options;
+    const names = await this.listToyKeyNames();
+    const toys = [];
+
+    for (const keyName of names) {
+      const toy = await this.getToyByKeyName(keyName, referenceTime);
+      if (!toy) continue;
+      if (clientKey && toy.created_by_ip !== clientKey) continue;
+      if (enabledOnly && !toy.enabled) continue;
+
+      toys.push(toy);
+    }
+
+    toys.sort((left, right) => left.id - right.id);
+    return toys;
+  }
+
+  async findToyById(id, options = {}) {
+    const { referenceTime = new Date() } = options;
+    const normalizedId = Number(id);
+    if (!Number.isInteger(normalizedId)) return null;
+
+    return this.getToyByKeyName(this.toyKey(normalizedId), referenceTime);
+  }
+
+  async nextToyId(referenceTime = new Date()) {
+    const toys = await this.listToys({ referenceTime });
+    let nextId = 1;
+
+    for (const toy of toys) {
+      if (toy.id === nextId) nextId += 1;
+      if (toy.id > nextId) break;
+    }
+
+    return nextId;
+  }
+
+  async saveToy(toy) {
+    const normalizedToy = normalizeToy(toy);
+    if (!normalizedToy) {
+      throw new Error('Cannot save invalid toy payload');
+    }
+
+    const expiration = toExpirationSeconds(normalizedToy.expires_at);
+    if (!Number.isFinite(expiration)) {
+      throw new Error('Toy expires_at must be a valid date-time string');
+    }
+
+    if (expiration <= Math.floor(Date.now() / 1000)) {
+      await this.kv.delete(this.toyKey(normalizedToy.id));
+      return normalizedToy;
+    }
+
+    await this.kv.put(this.toyKey(normalizedToy.id), JSON.stringify(normalizedToy), {
+      expiration,
+    });
+
+    return normalizedToy;
+  }
+
+  async deleteToy(id) {
+    const normalizedId = Number(id);
+    if (!Number.isInteger(normalizedId)) return false;
+
+    const existingToy = await this.findToyById(normalizedId);
+    if (!existingToy) return false;
+
+    await this.kv.delete(this.toyKey(normalizedId));
+    return true;
+  }
+
+  async countToys(options = {}) {
+    const toys = await this.listToys({ referenceTime: options.referenceTime });
+    return toys.length;
+  }
+
+  async countToysByClientKey(clientKey, options = {}) {
+    if (!clientKey) return 0;
+
+    const toys = await this.listToys({
+      clientKey,
+      referenceTime: options.referenceTime,
+    });
+
+    return toys.length;
+  }
+
+  async pruneExpiredToys(referenceTime = new Date()) {
+    const names = await this.listToyKeyNames();
+    let removedCount = 0;
+
+    for (const keyName of names) {
+      const rawToy = await this.kv.get(keyName, 'json');
+      const toy = normalizeToy(rawToy);
+
+      if (!toy || isToyExpired(toy, referenceTime)) {
+        await this.kv.delete(keyName);
+        removedCount += 1;
+      }
+    }
+
+    return removedCount;
+  }
+}

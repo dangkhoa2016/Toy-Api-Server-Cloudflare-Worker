@@ -1,4 +1,4 @@
-import { toyConstraints } from './constants.js';
+import { toyConstraints } from './variables.js';
 
 const allowedToyMutationKeys = new Set(['name', 'image', 'likes']);
 const allowedLikesMutationKeys = new Set(['likes']);

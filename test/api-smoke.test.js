@@ -53,6 +53,16 @@ async function parseJson(response) {
   }
 }
 
+function assertToyShape(toy) {
+  assert.equal(typeof toy.id, 'number');
+  assert.equal(typeof toy.name, 'string');
+  assert.equal(typeof toy.image, 'string');
+  assert.equal(typeof toy.likes, 'number');
+  assert.equal(typeof toy.enabled, 'boolean');
+  assert.equal(typeof toy.created_at, 'string');
+  assert.equal(typeof toy.updated_at, 'string');
+}
+
 test('GET / returns welcome message', async () => {
   const response = await apiRequest('/');
   const body = await response.text();
@@ -119,21 +129,117 @@ test('OPTIONS preflight for /api/toys returns CORS metadata', async () => {
   assert.match(response.headers.get('access-control-allow-headers') || '', /Content-Type/i);
 });
 
-test('POST /api/toys returns not implemented payload for current scope', async () => {
+test('POST /api/toys with invalid payload returns validation error', async () => {
   const response = await apiRequest('/api/toys', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      name: 'Robot',
-      image: 'https://example.com/robot.png',
-      likes: 0,
+      name: 'A',
+      image: 'not-a-uri',
     }),
   });
   const payload = await parseJson(response);
 
-  assert.equal(response.status, 501);
-  assert.equal(payload.error?.statusCode, 501);
-  assert.equal(payload.error?.message, 'Toy routes are not implemented yet');
+  assert.equal(response.status, 422);
+  assert.equal(payload.error?.statusCode, 422);
+  assert.equal(payload.error?.message, 'Toy name must be at least 2 characters long');
+});
+
+test('Toy API CRUD + likes + export flow', async () => {
+  const uniqueSuffix = Date.now();
+  const createResponse = await apiRequest('/api/toys', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      name: `Robot-${uniqueSuffix}`,
+      image: 'https://example.com/robot.png',
+      likes: 1,
+    }),
+  });
+  const createdToy = await parseJson(createResponse);
+
+  assert.equal(createResponse.status, 201);
+  assertToyShape(createdToy);
+  assert.ok(createdToy.id >= 1);
+  assert.equal(createdToy.likes, 1);
+  assert.equal(createResponse.headers.get('x-ratelimit-limit') !== null, true);
+  assert.equal(createResponse.headers.get('x-ratelimit-remaining') !== null, true);
+  assert.equal(createResponse.headers.get('x-ratelimit-reset') !== null, true);
+
+  const toyId = createdToy.id;
+
+  const getToyResponse = await apiRequest(`/api/toys/${toyId}`);
+  const foundToy = await parseJson(getToyResponse);
+  assert.equal(getToyResponse.status, 200);
+  assertToyShape(foundToy);
+  assert.equal(foundToy.id, toyId);
+
+  const likeResponse = await apiRequest(`/api/toys/${toyId}/likes`, {
+    method: 'PATCH',
+    headers: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ likes: 9 }),
+  });
+  const likedToy = await parseJson(likeResponse);
+
+  assert.equal(likeResponse.status, 200);
+  assert.equal(likedToy.id, toyId);
+  assert.equal(likedToy.likes, 9);
+
+  const updateResponse = await apiRequest(`/api/toys/${toyId}`, {
+    method: 'PATCH',
+    headers: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      name: `Robot-${uniqueSuffix}-v2`,
+      image: 'https://example.com/robot-v2.png',
+    }),
+  });
+  const updatedToy = await parseJson(updateResponse);
+
+  assert.equal(updateResponse.status, 200);
+  assert.equal(updatedToy.id, toyId);
+  assert.equal(updatedToy.name, `Robot-${uniqueSuffix}-v2`);
+  assert.equal(updatedToy.image, 'https://example.com/robot-v2.png');
+  assert.equal(updatedToy.likes, 9);
+
+  const listResponse = await apiRequest('/api/toys');
+  const toys = await parseJson(listResponse);
+
+  assert.equal(listResponse.status, 200);
+  assert.equal(Array.isArray(toys), true);
+  assert.equal(toys.some((toy) => toy.id === toyId), true);
+
+  const exportResponse = await apiRequest('/api/toys/export');
+  const exportText = await exportResponse.text();
+  const exportedToys = JSON.parse(exportText);
+
+  assert.equal(exportResponse.status, 200);
+  assert.match(exportResponse.headers.get('content-type') || '', /application\/json/i);
+  assert.match(
+    exportResponse.headers.get('content-disposition') || '',
+    /attachment; filename=export-toys-/,
+  );
+  assert.equal(Array.isArray(exportedToys), true);
+  assert.equal(exportedToys.some((toy) => toy.id === toyId), true);
+
+  const deleteResponse = await apiRequest(`/api/toys/${toyId}`, {
+    method: 'DELETE',
+  });
+  const deletePayload = await parseJson(deleteResponse);
+
+  assert.equal(deleteResponse.status, 200);
+  assert.equal(deletePayload.deleted, true);
+
+  const deletedReadResponse = await apiRequest(`/api/toys/${toyId}`);
+  const deletedReadPayload = await parseJson(deletedReadResponse);
+
+  assert.equal(deletedReadResponse.status, 404);
+  assert.equal(deletedReadPayload.error?.statusCode, 404);
 });

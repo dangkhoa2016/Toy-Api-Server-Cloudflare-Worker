@@ -1,4 +1,4 @@
-import { parseBoolean, statusCodes } from './constants.js';
+import { parseBoolean, statusCodes } from './variables.js';
 
 const DEFAULT_REALM = 'Toy API';
 const DEFAULT_SKIPPED_PATHS = ['/health', '/favicon.ico', '/favicon.png'];

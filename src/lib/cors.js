@@ -1,4 +1,4 @@
-import { statusCodes } from './constants.js';
+import { statusCodes } from './variables.js';
 
 export const corsAllowedHeaders = [
   'Authorization',
