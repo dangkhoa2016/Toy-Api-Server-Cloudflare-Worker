@@ -1,6 +1,18 @@
 # Toy API Server - Cloudflare Worker
 
-Cloudflare Worker implementation for migrating from the Node.js Fastify project.
+> 🌐 Language / Ngôn ngữ: **English** | [Tiếng Việt](README.vi.md)
+
+Cloudflare Worker implementation for migrating from the [Toy-Api-Server-Nodejs](https://github.com/dangkhoa2016/Toy-Api-Server-Nodejs) Fastify project.
+
+For a file-by-file comparison with the Node.js version, see [docs/comparison-with-nodejs.md](docs/comparison-with-nodejs.md).
+([Tiếng Việt](docs/comparison-with-nodejs.vi.md))
+
+## Frontend Integrations
+
+This API is also used as the backend for these frontend projects:
+
+- [Toys-UI-Javascript](https://github.com/dangkhoa2016/Toys-UI-Javascript)
+- [Toys-UI-VueJs](https://github.com/dangkhoa2016/Toys-UI-VueJs)
 
 ## Current scope
 
@@ -56,6 +68,16 @@ Cloudflare Worker implementation for migrating from the Node.js Fastify project.
 - KV stores: `src/stores/*.js`
 - Static docs/icons: `src/assets/**`
 
+## Anti-abuse policy
+
+`POST /api/toys` is protected by two independent layers:
+
+- **Layer 1 — HTTP rate limit:** max 20 requests per 5-minute window per IP.
+- **Layer 2 — Toy quota:** per-IP active toy cap, global active toy cap, and temporary seed-window expansion.
+
+See [docs/rate-limit.md](docs/rate-limit.md) for the full flow, headers, examples, and configuration reference.
+([Tiếng Việt](docs/rate-limit.vi.md))
+
 ## KV key naming
 
 Cloudflare KV entries in `TOY_STATE` use prefixes to separate data domains:
@@ -72,15 +94,8 @@ Default `CLOUDFLARE_KV_PREFIX` is `toy-api-server` when not explicitly configure
 
 ### KV key TTL
 
-Each key type has a different KV expiration TTL, derived from policy defaults plus a buffer:
-
-| Prefix | KV TTL | Calculation | Effective window / lifetime |
-| --- | --- | --- | --- |
-| `…:toy:<id>` | **900 s (15 min)** | `toyTtlMs` (default 15 min) | Toy lives exactly `TOY_TTL_MS` |
-| `…:ratelimit:<clientKey>` | **360 s (6 min)** | `ceil(rateLimitWindowMs / 1000) + 60 s buffer` | Rate-limit window is 5 min; key kept 1 min after reset |
-| `…:seed:<clientKey>` | **1680 s (28 min)** | `ceil((seedWindowMs + toyTtlMs) / 1000) + 180 s buffer` | Seed window is 10 min; key retained until last toy created at window end can expire (10 min + 15 min + 3 min buffer) |
-
-TTL defaults are defined in `src/lib/variables.js` (`toyPolicyFallbacks`). TTL buffer logic is applied in `src/stores/kv_state_store.js` (`normalizeTtlSeconds`).
+See [docs/kv-ttl.md](docs/kv-ttl.md) for the full TTL breakdown, calculation formulas, and configuration reference.
+([Tiếng Việt](docs/kv-ttl.vi.md))
 
 ## Local development
 

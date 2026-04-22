@@ -1,0 +1,21 @@
+
+# [production] list all keys in the production KV namespace
+yarn wrangler kv key list --binding TOY_STATE --remote -e production
+yarn wrangler kv key list --namespace-id [your namespace id] --remote
+
+# [development] list all keys in the local KV namespace
+yarn wrangler kv key list --binding TOY_STATE --local -e development -c wrangler.template.toml --preview
+yarn wrangler kv key list --namespace-id kv-local --local
+
+# list all keys in the production KV namespace (only names)
+yarn wrangler kv key list --binding TOY_STATE --remote -e production | jq -r '.[].name'
+
+# [production] Delete all keys in the production KV namespace (use with caution!)
+yarn -s wrangler kv key list --binding TOY_STATE --remote -e production | jq -r '.[].name' | xargs -I {} yarn -s wrangler kv key delete --binding TOY_STATE --remote -e production "{}"
+
+# [development] Delete all keys in the local KV namespace (use with caution!)
+yarn -s wrangler kv key list --binding TOY_STATE --local -e development -c wrangler.template.toml --preview | jq -r '.[].name' | xargs -I {} yarn -s wrangler kv key delete --binding TOY_STATE --local -e development -c wrangler.template.toml --preview "{}"
+
+# for local development, inspect data by running this command:
+node learn/inspect_db.js
+
